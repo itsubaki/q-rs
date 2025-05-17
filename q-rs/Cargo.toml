@@ -1,0 +1,12 @@
+[package]
+name = "q-rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["itsubaki"]
+description = "Quantum Computation Simulator for Rust"
+repository = "https://github.com/itsubaki/q-rs"
+
+[dependencies]
+rand = "0.9.1"
+num = "0.4.0"
