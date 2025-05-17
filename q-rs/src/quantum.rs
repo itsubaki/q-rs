@@ -176,6 +176,12 @@ impl Q {
     }
 }
 
+impl Default for Q {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn gate_list(nob: u32, g: Gate, qb: &[u32]) -> Vec<Gate> {
     let mut list: Vec<Gate> = vec![];
 
