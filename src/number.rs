@@ -10,12 +10,12 @@ pub fn is_prime(n: u32) -> bool {
         return true;
     }
 
-    if n % 2 == 0 {
+    if n.is_multiple_of(2) {
         return false;
     }
 
     for i in 3..(integer::sqrt(n) + 1) {
-        if n % i == 0 {
+        if n.is_multiple_of(i) {
             return false;
         }
     }
@@ -158,7 +158,7 @@ pub fn find_order(a: u32, n: u32, bin: &[char]) -> (u32, u32, bool) {
 
 pub fn is_trivial(n: u32, factor: &[u32]) -> bool {
     for p in factor.iter() {
-        if 1 < *p && *p < n && n % p == 0 {
+        if 1 < *p && *p < n && n.is_multiple_of(*p) {
             return false;
         }
     }

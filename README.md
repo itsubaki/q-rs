@@ -21,7 +21,6 @@ loop {
     qsim.cmodexp2(a, n, &r0, &r1);
     qsim.iqft(&r0);
 
-    let mut found = false;
     for state in qsim.state().iter() {
         let m0 = state.to_binary_chars(&r0);
 

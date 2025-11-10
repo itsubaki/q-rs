@@ -10,7 +10,7 @@ pub type Gate = Vec<Vec<Complex64>>;
 pub type BinaryChars = Vec<char>;
 
 pub struct State {
-    number_of_bit: u32,
+    number_of_qubits: u32,
     pub index: usize,
     pub amp: Complex64,
     pub prob: f64,
@@ -18,7 +18,7 @@ pub struct State {
 
 impl State {
     pub fn to_binary_chars(&self, qb: &[u32]) -> BinaryChars {
-        let v = to_binary_chars(self.index, self.number_of_bit as usize);
+        let v = to_binary_chars(self.index, self.number_of_qubits as usize);
 
         let mut bin = vec![];
         for i in qb {
@@ -31,7 +31,7 @@ impl State {
 
 impl std::fmt::Display for State {
     fn fmt(&self, dest: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let bits: String = format!("{:>0n$b}", self.index, n = self.number_of_bit as usize);
+        let bits: String = format!("{:>0n$b}", self.index, n = self.number_of_qubits as usize);
         write!(
             dest,
             "[{}]({:>+.4} {:>+.4}): {:>.4}",
@@ -56,7 +56,7 @@ impl Q {
         }
 
         self.tensor(qb);
-        self.number_of_bit() - 1
+        self.number_of_qubits() - 1
     }
 
     pub fn zero(&mut self) -> u32 {
@@ -90,7 +90,7 @@ impl Q {
         self.qb = v
     }
 
-    pub fn number_of_bit(&self) -> u32 {
+    pub fn number_of_qubits(&self) -> u32 {
         (self.qb.len() as f64).log2() as u32
     }
 
@@ -103,7 +103,7 @@ impl Q {
     }
 
     fn apply_with(&mut self, g: Gate, qb: &[u32]) {
-        let list: Vec<Gate> = gate_list(self.number_of_bit(), g, qb);
+        let list: Vec<Gate> = gate_list(self.number_of_qubits(), g, qb);
         let g: Gate = tensor_with(&list);
 
         self.apply(g)
@@ -126,7 +126,7 @@ impl Q {
     }
 
     pub fn cmodexp2(&mut self, a: u32, n: u32, r0: &[u32], r1: &[u32]) {
-        let nob = self.number_of_bit();
+        let nob = self.number_of_qubits();
         for (i, c) in r0.iter().enumerate() {
             self.apply(cmodexp2(nob, a, i as u32, n, *c, r1))
         }
@@ -149,14 +149,14 @@ impl Q {
     }
 
     pub fn cr(&mut self, theta: f64, control: u32, target: u32) {
-        let n = self.number_of_bit();
+        let n = self.number_of_qubits();
         let g: Gate = cr(theta, n, control, target);
         self.apply(g)
     }
 
     pub fn state(&self) -> Vec<State> {
         let mut list = vec![];
-        let nob = self.number_of_bit();
+        let nob = self.number_of_qubits();
 
         for i in 0..self.qb.len() {
             let r = round(self.qb[i]);
@@ -165,7 +165,7 @@ impl Q {
             }
 
             list.push(State {
-                number_of_bit: nob,
+                number_of_qubits: nob,
                 index: i,
                 amp: r,
                 prob: r.norm().powf(2.0),
@@ -200,7 +200,7 @@ fn gate_list(nob: u32, g: Gate, qb: &[u32]) -> Vec<Gate> {
             continue;
         }
 
-        list.push(id());
+        list.push(id(1));
     }
 
     list
@@ -236,23 +236,19 @@ fn tensor(m: Gate, n: Gate) -> Gate {
     g
 }
 
-fn id() -> Gate {
-    id_with(1)
-}
-
-fn x() -> Gate {
+pub fn x() -> Gate {
     vec![
         vec![Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)],
         vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
     ]
 }
 
-fn h() -> Gate {
+pub fn h() -> Gate {
     let e = Complex::new(1.0 / std::f64::consts::SQRT_2, 0.0);
     vec![vec![e, e], vec![e, -1.0 * e]]
 }
 
-fn id_with(nob: u32) -> Gate {
+pub fn id(nob: u32) -> Gate {
     let s = 1 << nob;
     let mut g = vec![vec![Complex::new(0.0, 0.0); s]; s];
 
@@ -263,8 +259,8 @@ fn id_with(nob: u32) -> Gate {
     g
 }
 
-fn cr(theta: f64, nob: u32, control: u32, target: u32) -> Gate {
-    let mut g: Gate = id_with(nob);
+pub fn cr(theta: f64, nob: u32, control: u32, target: u32) -> Gate {
+    let mut g: Gate = id(nob);
     let e = Complex::new(0.0, theta).exp();
     let mask = (1 << (nob - 1 - control)) as usize;
 
@@ -277,7 +273,7 @@ fn cr(theta: f64, nob: u32, control: u32, target: u32) -> Gate {
     g
 }
 
-fn cmodexp2(nob: u32, a: u32, j: u32, n: u32, control: u32, target: &[u32]) -> Gate {
+pub fn cmodexp2(nob: u32, a: u32, j: u32, n: u32, control: u32, target: &[u32]) -> Gate {
     let r1len = target.len() as u32;
     let a2jmodn = super::number::modexp2(a, j, n);
 
@@ -298,7 +294,7 @@ fn cmodexp2(nob: u32, a: u32, j: u32, n: u32, control: u32, target: &[u32]) -> G
         *idx = (i >> r1len << r1len) | a2jkmodn as usize;
     }
 
-    let id: Gate = id_with(nob);
+    let id: Gate = id(nob);
     let mut g: Gate = vec![vec![]; id.len()];
     for (i, ii) in index.iter().enumerate() {
         g[*ii] = id[i].to_vec();
