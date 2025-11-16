@@ -125,13 +125,6 @@ impl Q {
         self.qb = v
     }
 
-    pub fn cmodexp2(&mut self, a: u32, n: u32, r0: &[u32], r1: &[u32]) {
-        let nob = self.number_of_qubits();
-        for (i, c) in r0.iter().enumerate() {
-            self.apply(cmodexp2(nob, a, i as u32, n, *c, r1))
-        }
-    }
-
     pub fn iqft(&mut self, qb: &[u32]) {
         let len = qb.len();
 
@@ -273,36 +266,6 @@ pub fn cr(theta: f64, nob: u32, control: u32, target: u32) -> Gate {
     g
 }
 
-pub fn cmodexp2(nob: u32, a: u32, j: u32, n: u32, control: u32, target: &[u32]) -> Gate {
-    let r1len = target.len() as u32;
-    let a2jmodn = super::number::modexp2(a, j, n);
-
-    let mut index: Vec<usize> = (0..(1 << nob)).collect();
-    for (i, idx) in index.iter_mut().enumerate() {
-        if (i >> (nob - 1 - control)) & 1 == 0 {
-            continue;
-        }
-
-        let mask = (1 << r1len) - 1;
-        let k = (i & mask) as u32;
-        if k > (n - 1) {
-            continue;
-        }
-
-        // i -> a**2**j *k mod n
-        let a2jkmodn = (a2jmodn * k) % n;
-        *idx = (i >> r1len << r1len) | a2jkmodn as usize;
-    }
-
-    let id: Gate = id(nob);
-    let mut g: Gate = vec![vec![]; id.len()];
-    for (i, ii) in index.iter().enumerate() {
-        g[*ii] = id[i].to_vec();
-    }
-
-    g
-}
-
 fn round(c: Complex64) -> Complex64 {
     let mut round = c;
     if c.re.abs() < 1e-13 {
@@ -326,50 +289,4 @@ fn test_to_binary_chars() {
     assert_eq!(to_binary_chars(7, 5), vec!['0', '0', '1', '1', '1']);
     assert_eq!(to_binary_chars(15, 5), vec!['0', '1', '1', '1', '1']);
     assert_eq!(to_binary_chars(31, 5), vec!['1', '1', '1', '1', '1']);
-}
-
-#[test]
-fn test_is_eigen_vector() {
-    let n = 15;
-    let a = 7;
-    let t = 3;
-
-    let mut qsim = Q::new();
-    let r0 = qsim.zeros(t);
-    let r1 = qsim.zero_log2(n);
-
-    qsim.x(&[r1[r1.len() - 1]]);
-    qsim.h(&r0);
-    qsim.cmodexp2(a, n, &r0, &r1);
-    qsim.iqft(&r0);
-
-    let mut us = std::collections::HashMap::new();
-    for state in qsim.state().iter() {
-        let m1 = state.to_binary_chars(&r1);
-        let ui: String = m1.iter().collect();
-
-        let v = match us.get(&ui) {
-            Some(vv) => state.amp + vv,
-            None => state.amp,
-        };
-
-        us.insert(ui, v);
-    }
-
-    let expected = vec![
-        ("0001", Complex::new(1.0, 0.0)),
-        ("0100", Complex::new(0.0, 0.0)),
-        ("0111", Complex::new(0.0, 0.0)),
-        ("1101", Complex::new(0.0, 0.0)),
-    ];
-
-    for (i, e) in expected {
-        let v = match us.get(i) {
-            Some(v) => *v,
-            None => panic!("{} not found", i),
-        };
-
-        assert!((v - e).re.abs() < 1e-13);
-        assert!((v - e).im.abs() < 1e-13);
-    }
 }

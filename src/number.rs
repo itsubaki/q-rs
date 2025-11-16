@@ -14,7 +14,7 @@ pub fn is_prime(n: u32) -> bool {
         return false;
     }
 
-    for i in 3..(integer::sqrt(n) + 1) {
+    for i in (3..integer::sqrt(n)).step_by(2) {
         if n.is_multiple_of(i) {
             return false;
         }
@@ -90,7 +90,7 @@ pub fn continued_fraction(f: f64) -> Vec<u32> {
     let mut r = f;
 
     loop {
-        let t = r.trunc();
+        let t = r.floor();
         list.push(t as u32);
 
         let diff = r - t;
@@ -105,21 +105,22 @@ pub fn continued_fraction(f: f64) -> Vec<u32> {
 }
 
 pub fn convergent(cf: &[u32]) -> (u32, u32) {
-    let len = cf.len();
-    if len == 1 {
-        return (cf[0], 1);
+    let mut p0: u32 = 0;
+    let mut p1: u32 = 1;
+    let mut q0: u32 = 1;
+    let mut q1: u32 = 0;
+
+    for &a in cf {
+        let p = a * p1 + p0;
+        let q = a * q1 + q0;
+
+        p0 = p1;
+        p1 = p;
+        q0 = q1;
+        q1 = q;
     }
 
-    let mut s = 1;
-    let mut r = cf[len - 1];
-    for i in 2..len {
-        let tmp = s;
-        s = r;
-        r = cf[len - i] * r + tmp;
-    }
-    s += cf[0] * r;
-
-    (s, r)
+    (p1, q1)
 }
 
 pub fn parse_float(bin: &[char]) -> f64 {
