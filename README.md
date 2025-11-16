@@ -18,7 +18,12 @@ loop {
 
     qsim.x(&[r1[r1.len() - 1]]);
     qsim.h(&r0);
-    qsim.cmodexp2(a, n, &r0, &r1);
+    
+    let nob = qsim.number_of_qubits();
+    for (i, c) in r0.iter().enumerate() {
+        qsim.apply(cmodexp2(nob, a, i as u32, n, *c, &r1))
+    }
+    
     qsim.iqft(&r0);
 
     for state in qsim.state().iter() {
