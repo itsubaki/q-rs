@@ -1,6 +1,6 @@
 # q-rs
 
-Quantum computing simulator in Rust
+Quantum computing simulator in Rust.
 
 ## Example
 
