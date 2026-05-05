@@ -8,5 +8,5 @@ description = "Quantum Computation Simulator for Rust"
 repository = "https://github.com/itsubaki/q-rs"
 
 [dependencies]
-rand = "0.9.1"
+rand = "0.9.3"
 num = "0.4.0"
