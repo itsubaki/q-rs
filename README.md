@@ -26,7 +26,6 @@ loop {
 
     for state in qsim.state().iter() {
         let m0 = state.to_binary_chars(&r0);
-
         let (s, r, ok) = number::find_order(a, n, &m0);
         if !ok || number::is_odd(r) {
              continue;
