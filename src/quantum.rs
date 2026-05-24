@@ -17,12 +17,12 @@ pub struct State {
 }
 
 impl State {
-    pub fn to_binary_chars(&self, qb: &[u32]) -> BinaryChars {
+    pub fn to_binary_chars(&self, qb: &[usize]) -> BinaryChars {
         let v = to_binary_chars(self.index, self.number_of_qubits);
 
         let mut bin = vec![];
         for i in qb {
-            bin.push(v[*i as usize]);
+            bin.push(v[*i]);
         }
 
         bin
