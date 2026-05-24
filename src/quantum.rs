@@ -10,7 +10,7 @@ pub type Gate = Vec<Vec<Complex64>>;
 pub type BinaryChars = Vec<char>;
 
 pub struct State {
-    number_of_qubits: u32,
+    number_of_qubits: usize,
     pub index: usize,
     pub amp: Complex64,
     pub prob: f64,
@@ -18,7 +18,7 @@ pub struct State {
 
 impl State {
     pub fn to_binary_chars(&self, qb: &[u32]) -> BinaryChars {
-        let v = to_binary_chars(self.index, self.number_of_qubits as usize);
+        let v = to_binary_chars(self.index, self.number_of_qubits);
 
         let mut bin = vec![];
         for i in qb {
@@ -31,7 +31,7 @@ impl State {
 
 impl std::fmt::Display for State {
     fn fmt(&self, dest: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let bits: String = format!("{:>0n$b}", self.index, n = self.number_of_qubits as usize);
+        let bits: String = format!("{:>0n$b}", self.index, n = self.number_of_qubits);
         write!(
             dest,
             "[{}]({:>+.4} {:>+.4}): {:>.4}",
@@ -42,97 +42,126 @@ impl std::fmt::Display for State {
 
 pub struct Q {
     qb: Qubit,
+    number_of_qubits: usize,
+}
+
+impl Default for Q {
+    fn default() -> Self {
+        Self {
+            qb: Qubit::new(),
+            number_of_qubits: 1,
+        }
+    }
 }
 
 impl Q {
-    pub fn new() -> Q {
-        Q { qb: vec![] }
+    pub fn new() -> Self {
+        Self {
+            qb: vec![],
+            number_of_qubits: 0,
+        }
     }
 
-    pub fn add(&mut self, qb: Qubit) -> u32 {
+    pub fn number_of_qubits(&self) -> usize {
+        self.number_of_qubits
+    }
+
+    pub fn zero(&mut self) -> usize {
         if self.qb.is_empty() {
-            self.qb = qb;
+            self.qb = vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)];
+
+            self.number_of_qubits += 1;
             return 0;
         }
 
-        self.tensor(qb);
-        self.number_of_qubits() - 1
-    }
-
-    pub fn zero(&mut self) -> u32 {
-        self.add(vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)])
-    }
-
-    pub fn zeros(&mut self, n: u32) -> Vec<u32> {
-        let mut list = vec![];
-
-        for _ in 0..n {
-            list.push(self.zero());
+        let now = std::mem::take(&mut self.qb);
+        self.qb = Vec::with_capacity(now.len() * 2);
+        for v in now {
+            self.qb.push(v);
+            self.qb.push(Complex64::new(0.0, 0.0));
         }
 
-        list
+        self.number_of_qubits += 1;
+        self.number_of_qubits - 1
     }
 
-    pub fn zero_log2(&mut self, n: u32) -> Vec<u32> {
-        let log2n = ((n as f64).log2() as u32) + 1;
-        self.zeros(log2n)
-    }
-
-    fn tensor(&mut self, qb: Qubit) {
-        let mut v: Qubit = vec![];
-
-        for x in &self.qb {
-            for y in &qb {
-                v.push(x * y);
-            }
-        }
-
-        self.qb = v
-    }
-
-    pub fn number_of_qubits(&self) -> u32 {
-        (self.qb.len() as f64).log2() as u32
-    }
-
-    pub fn x(&mut self, qb: &[u32]) {
-        self.apply_with(x(), qb)
-    }
-
-    pub fn h(&mut self, qb: &[u32]) {
-        self.apply_with(h(), qb)
-    }
-
-    fn apply_with(&mut self, g: Gate, qb: &[u32]) {
-        let list: Vec<Gate> = gate_list(self.number_of_qubits(), g, qb);
-        let g: Gate = tensor_with(&list);
-
-        self.apply(g)
+    pub fn zeros(&mut self, n: usize) -> Vec<usize> {
+        (0..n).map(|_| self.zero()).collect()
     }
 
     pub fn apply(&mut self, g: Gate) {
-        let mut v: Qubit = vec![];
-
-        for item in &g {
-            let mut e = Complex::new(0.0, 0.0);
-
-            for (j, _) in item.iter().enumerate() {
-                e += item[j] * self.qb[j];
+        let mut next = Vec::with_capacity(self.qb.len());
+        for row in &g {
+            let mut acc = Complex64::new(0.0, 0.0);
+            for (&gij, &qj) in row.iter().zip(&self.qb) {
+                acc += gij * qj;
             }
 
-            v.push(e);
+            next.push(acc);
         }
 
-        self.qb = v
+        self.qb = next;
     }
 
-    pub fn iqft(&mut self, qb: &[u32]) {
-        let len = qb.len();
+    fn g(&mut self, target: usize, m00: Complex64, m01: Complex64, m10: Complex64, m11: Complex64) {
+        let bit = 1usize << (self.number_of_qubits - 1 - target);
 
+        for i in 0..self.qb.len() {
+            if (i & bit) != 0 {
+                continue;
+            }
+
+            let j = i | bit;
+            let a = self.qb[i];
+            let b = self.qb[j];
+            self.qb[i] = m00 * a + m01 * b;
+            self.qb[j] = m10 * a + m11 * b;
+        }
+    }
+
+    pub fn x(&mut self, qb: &[usize]) {
+        for &q in qb {
+            self.g(
+                q,
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            );
+        }
+    }
+
+    pub fn h(&mut self, qb: &[usize]) {
+        let s = 1.0 / std::f64::consts::SQRT_2;
+        for &q in qb {
+            self.g(
+                q,
+                Complex64::new(s, 0.0),
+                Complex64::new(s, 0.0),
+                Complex64::new(s, 0.0),
+                Complex64::new(-s, 0.0),
+            );
+        }
+    }
+
+    pub fn cr(&mut self, theta: f64, control: usize, target: usize) {
+        let cbit = 1usize << (self.number_of_qubits - 1 - control);
+        let tbit = 1usize << (self.number_of_qubits - 1 - target);
+        let phase = Complex64::new(0.0, theta).exp();
+
+        for i in 0..self.qb.len() {
+            if (i & cbit) != 0 && (i & tbit) != 0 {
+                self.qb[i] *= phase;
+            }
+        }
+    }
+
+    pub fn iqft(&mut self, qb: &[usize]) {
+        let len = qb.len();
         for i in (0..len).rev() {
             let mut k = (len - i) as i32;
-
             for j in ((i + 1)..len).rev() {
-                let theta = -2.0 * std::f64::consts::PI / (2.0_f64.powf(k as f64));
+                let theta = -2.0 * std::f64::consts::PI / (2.0_f64.powi(k));
                 self.cr(theta, qb[j], qb[i]);
                 k -= 1;
             }
@@ -141,129 +170,25 @@ impl Q {
         }
     }
 
-    pub fn cr(&mut self, theta: f64, control: u32, target: u32) {
-        let n = self.number_of_qubits();
-        let g: Gate = cr(theta, n, control, target);
-        self.apply(g)
-    }
-
     pub fn state(&self) -> Vec<State> {
         let mut list = vec![];
-        let nob = self.number_of_qubits();
+        for (i, &amp) in self.qb.iter().enumerate() {
+            let amp = round(amp);
 
-        for i in 0..self.qb.len() {
-            let r = round(self.qb[i]);
-            if r.is_zero() {
+            if amp.is_zero() {
                 continue;
             }
 
             list.push(State {
-                number_of_qubits: nob,
+                number_of_qubits: self.number_of_qubits,
                 index: i,
-                amp: r,
-                prob: r.norm().powf(2.0),
+                amp,
+                prob: amp.norm_sqr(),
             });
         }
 
         list
     }
-}
-
-impl Default for Q {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn gate_list(nob: u32, g: Gate, qb: &[u32]) -> Vec<Gate> {
-    let mut list: Vec<Gate> = vec![];
-
-    for i in 0..nob {
-        let mut found = false;
-
-        for j in qb {
-            if i == *j {
-                found = true;
-                break;
-            }
-        }
-
-        if found {
-            list.push(g.to_vec());
-            continue;
-        }
-
-        list.push(id(1));
-    }
-
-    list
-}
-
-fn tensor_with(list: &[Gate]) -> Gate {
-    let mut g: Gate = list[0].to_vec();
-
-    for i in list.iter().skip(1) {
-        g = tensor(g, i.to_vec());
-    }
-
-    g
-}
-
-fn tensor(m: Gate, n: Gate) -> Gate {
-    let mut g: Gate = vec![];
-
-    for (i, _) in m.iter().enumerate() {
-        for (k, _) in n.iter().enumerate() {
-            let mut v = vec![];
-
-            for (j, _) in m[i].iter().enumerate() {
-                for (l, _) in n[k].iter().enumerate() {
-                    v.push(m[i][j] * n[k][l]);
-                }
-            }
-
-            g.push(v);
-        }
-    }
-
-    g
-}
-
-pub fn x() -> Gate {
-    vec![
-        vec![Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)],
-        vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
-    ]
-}
-
-pub fn h() -> Gate {
-    let e = Complex::new(1.0 / std::f64::consts::SQRT_2, 0.0);
-    vec![vec![e, e], vec![e, -1.0 * e]]
-}
-
-pub fn id(nob: u32) -> Gate {
-    let s = 1 << nob;
-    let mut g = vec![vec![Complex::new(0.0, 0.0); s]; s];
-
-    for (i, row) in g.iter_mut().enumerate() {
-        row[i] = Complex::new(1.0, 0.0);
-    }
-
-    g
-}
-
-pub fn cr(theta: f64, nob: u32, control: u32, target: u32) -> Gate {
-    let mut g: Gate = id(nob);
-    let e = Complex::new(0.0, theta).exp();
-    let mask = (1 << (nob - 1 - control)) as usize;
-
-    for (i, v) in g.iter_mut().enumerate() {
-        if (i & mask) == mask && (i & (1 << (nob - 1 - target))) != 0 {
-            v[i] = e * v[i];
-        }
-    }
-
-    g
 }
 
 fn round(c: Complex64) -> Complex64 {
@@ -279,8 +204,8 @@ fn round(c: Complex64) -> Complex64 {
     round
 }
 
-fn to_binary_chars(i: usize, nob: usize) -> BinaryChars {
-    format!("{:>0n$b}", i, n = nob).chars().collect()
+fn to_binary_chars(i: usize, num: usize) -> BinaryChars {
+    format!("{:>0n$b}", i, n = num).chars().collect()
 }
 
 #[test]

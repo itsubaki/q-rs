@@ -14,16 +14,14 @@ let t: u32 = 3; // precision bits
 loop {
     let mut qsim = quantum::Q::new();
     let r0 = qsim.zeros(t);
-    let r1 = qsim.zero_log2(n);
+    let r1 = qsim.zeros(4);
 
     qsim.x(&[r1[r1.len() - 1]]);
     qsim.h(&r0);
-    
-    let nob = qsim.number_of_qubits();
+    let num = qsim.number_of_qubits();
     for (i, c) in r0.iter().enumerate() {
-        qsim.apply(cmodexp2(nob, a, i as u32, n, *c, &r1))
+        qsim.apply(cmodexp2(num, a, i as u32, n, *c, &r1))
     }
-    
     qsim.iqft(&r0);
 
     for state in qsim.state().iter() {
