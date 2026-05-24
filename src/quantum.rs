@@ -156,7 +156,7 @@ impl Q {
         }
     }
 
-    pub fn iqft(&mut self, qb: &[usize]) {
+    pub fn inv_qft(&mut self, qb: &[usize]) {
         let len = qb.len();
         for i in (0..len).rev() {
             let mut k = (len - i) as i32;

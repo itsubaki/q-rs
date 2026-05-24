@@ -22,7 +22,7 @@ loop {
     for (i, c) in r0.iter().enumerate() {
         qsim.apply(cmodexp2(num, a, i as u32, n, *c, &r1))
     }
-    qsim.iqft(&r0);
+    qsim.inv_qft(&r0);
 
     for state in qsim.state().iter() {
         let m0 = state.to_binary_chars(&r0);
