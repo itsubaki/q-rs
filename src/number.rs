@@ -14,7 +14,8 @@ pub fn is_prime(n: u32) -> bool {
         return false;
     }
 
-    for i in (3..integer::sqrt(n)).step_by(2) {
+    let limit = integer::sqrt(n);
+    for i in (3..=limit).step_by(2) {
         if n.is_multiple_of(i) {
             return false;
         }
