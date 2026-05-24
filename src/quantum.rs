@@ -9,36 +9,33 @@ pub type Gate = Vec<Vec<Complex64>>;
 
 pub type BinaryChars = Vec<char>;
 
-pub type Register = Vec<usize>;
-
 pub struct State {
     number_of_qubits: usize,
     pub index: usize,
     pub amp: Complex64,
     pub prob: f64,
-    pub registers: Vec<Register>,
 }
 
 impl State {
-    pub fn to_binary_chars(&self, reg: usize) -> String {
-        let bits = to_binary_chars(self.index, self.number_of_qubits);
-        self.registers[reg].iter().map(|&i| bits[i]).collect()
+    pub fn to_binary_chars(&self, qb: &[usize]) -> BinaryChars {
+        let v = to_binary_chars(self.index, self.number_of_qubits);
+
+        let mut bin = vec![];
+        for i in qb {
+            bin.push(v[*i]);
+        }
+
+        bin
     }
 }
 
 impl std::fmt::Display for State {
     fn fmt(&self, dest: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let regs = self
-            .registers
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("[{}]", self.to_binary_chars(i)))
-            .collect::<String>();
-
+        let bits: String = format!("{:>0n$b}", self.index, n = self.number_of_qubits);
         write!(
             dest,
-            "{} ({:>+.4} {:>+.4}): {:.4}",
-            regs, self.amp.re, self.amp.im, self.prob,
+            "[{}]({:>+.4} {:>+.4}): {:>.4}",
+            bits, self.amp.re, self.amp.im, self.prob,
         )
     }
 }
@@ -173,10 +170,11 @@ impl Q {
         }
     }
 
-    pub fn state(&self, registers: Vec<Register>) -> Vec<State> {
+    pub fn state(&self) -> Vec<State> {
         let mut list = vec![];
         for (i, &amp) in self.qb.iter().enumerate() {
             let amp = round(amp);
+
             if amp.is_zero() {
                 continue;
             }
@@ -186,7 +184,6 @@ impl Q {
                 index: i,
                 amp,
                 prob: amp.norm_sqr(),
-                registers: registers.clone(),
             });
         }
 
